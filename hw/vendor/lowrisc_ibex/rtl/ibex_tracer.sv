@@ -68,8 +68,6 @@ module ibex_tracer (
   logic [63:0] unused_rvfi_order = rvfi_order;
   logic        unused_rvfi_trap = rvfi_trap;
   logic        unused_rvfi_halt = rvfi_halt;
-  logic        unused_rvfi_intr = rvfi_intr;
-  logic [ 1:0] unused_rvfi_mode = rvfi_mode;
 
   import ibex_pkg::*;
   import ibex_tracer_pkg::*;
@@ -90,6 +88,7 @@ module ibex_tracer (
 
   function void printbuffer_dumpline();
     string rvfi_insn_str;
+    string mode;
 
     if (file_handle == 32'h0) begin
       string file_name_base = "trace_core";
@@ -109,7 +108,13 @@ module ibex_tracer (
       rvfi_insn_str = $sformatf("%h", rvfi_insn);
     end
 
-    $fwrite(file_handle, "%15t\t%d\t%h\t%s\t%s\t", $time, cycle, rvfi_pc_rdata, rvfi_insn_str, decoded_str);
+    mode = get_mode_name(rvfi_mode);
+
+    if (rvfi_intr) begin
+      $fwrite(file_handle, "%15t\t%d\t%h!\t%s\t%s\t%s\t", $time, cycle, rvfi_pc_rdata, mode, rvfi_insn_str, decoded_str);
+    end else begin
+      $fwrite(file_handle, "%15t\t%d\t%h\t%s\t%s\t%s\t", $time, cycle, rvfi_pc_rdata, mode, rvfi_insn_str, decoded_str);
+    end
 
     if ((data_accessed & RS1) != 0) begin
       $fwrite(file_handle, " %s:0x%08x", reg_addr_to_str(rvfi_rs1_addr), rvfi_rs1_rdata);
@@ -142,6 +147,16 @@ module ibex_tracer (
     end else begin
       return $sformatf("x%0d", addr);
     end
+  endfunction
+
+  // Get a mode name from an rvfi_mode code
+  function string get_mode_name(input logic [1:0] mode);
+    unique case (mode)
+      2'd0: return "U";
+      2'd1: return "S";
+      2'd3: return "M";
+      default: return $sformatf("%d?", mode);
+    endcase
   endfunction
 
   // Get a CSR name for a CSR address.
